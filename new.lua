@@ -1,8 +1,11 @@
 --[[
     NEBULA HUB | TRADE & ESP EDITION
-    - Fitur Tersisa: Trade & Esp Visual
+    - Fitur Tersisa: Trade & Esp Visual & Auto Hatch
     - Ukuran: Ringan & Teroptimasi
 ]]
+
+-- Menunggu game ter-load sempurna agar UI tidak gagal muncul
+if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
@@ -12,10 +15,13 @@ local Players = game.Players
 local lp = Players.LocalPlayer
 local CS = game:GetService("CollectionService")
 
--- Replicated Modules
-local DataService = require(RS.Modules.DataService)
-local ItemRarityFinder = require(RS.Modules.ItemRarityFinder)
-local GGStaticData = require(RS.Modules.GardenGuideModules.DataModules.GGStaticData)
+-- Replicated Modules dengan Pcall untuk keamanan inisialisasi
+local DataService, ItemRarityFinder, GGStaticData
+pcall(function()
+    DataService = require(RS.Modules.DataService)
+    ItemRarityFinder = require(RS.Modules.ItemRarityFinder)
+    GGStaticData = require(RS.Modules.GardenGuideModules.DataModules.GGStaticData)
+end)
 
 -- ================= PET NAME FIX =================
 local eggPets = {}
@@ -38,7 +44,7 @@ local Window = Fluent:CreateWindow({
     SubTitle = "Minimalist Version",
     Icon = "eye",
     TabWidth = 160,
-    Size = UDim2.fromOffset(510, 480),
+    Size = UDim2.fromOffset(510, 400),
     Acrylic = true,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl 
@@ -50,8 +56,8 @@ local Config = {
     TradeSubmitDelay = 0.15, AutoAcceptTrade = false, AutoAcceptRequest = false,
     AutoAddPetLoop = false, IsTradeProcessing = false,
     EspEgg = false,
-    -- Auto Hatch Config
-    AutoPlaceEgg = false, PlaceAmount = 1, PlaceDelay = 0.5
+    -- Auto Hatch Config Added
+    AutoPlaceEgg = false, PlaceAmount = 1, PlaceDelay = 0.4
 }
 
 -- Tabs
@@ -67,6 +73,7 @@ local function buildBW()
     if EggBW._isUpdating then return end
     EggBW._isUpdating = true
     pcall(function()
+        if not DataService then return end
         local data = DataService:GetData()
         if not data then return end
         local function scan(t)
@@ -164,7 +171,7 @@ task.spawn(function()
                         local text = ""
                         if not ready then
                             text = string.format('<font color="#FFD400">%s</font>\n<font color="#FF5E00">%s</font>\n<font size="12" color="#BBBBBB">BW: %skg</font>', eggName, formatTime(timeLeft), bw)
-          0 0 0         else
+                        else
                             local est = __round(bw * 1.10, 2)
                             local size, sColor = getSizeInfo(est)
                             text = string.format('<font color="#FFD400">%s</font>\n<font color="#FFFFFF">%s (%skg)</font>\n<font color="%s">[%s]</font>', eggName, petName, est, sColor, size)
@@ -229,11 +236,11 @@ task.spawn(function()
 end)
 
 --------------------------------------------------------------------------------
--- AUTO HATCH SECTION (FIX: AUTO PLACE)
+-- AUTO HATCH TAB (FIXED LOGIC)
 --------------------------------------------------------------------------------
-local HatchSec = Tabs.AutoHatch:AddSection("Auto Place Egg")
+local HatchSec = Tabs.AutoHatch:AddSection("Egg Management")
 
-HatchSec:AddInput("PlaceCount", {
+HatchSec:AddInput("PlaceAmt", {
     Title = "Amount to Place",
     Default = "1",
     Numeric = true,
@@ -241,33 +248,33 @@ HatchSec:AddInput("PlaceCount", {
     Callback = function(v) Config.PlaceAmount = tonumber(v) or 1 end
 })
 
-HatchSec:AddToggle("EnableAutoPlace", {
-    Title = "Enable Auto Place",
-    Description = "Places eggs at your current position",
+HatchSec:AddToggle("AutoPlace", {
+    Title = "Auto Place Eggs",
+    Description = "Places eggs at your current feet position",
     Default = false,
     Callback = function(v) Config.AutoPlaceEgg = v end
 })
 
 task.spawn(function()
-    while task.wait(Config.PlaceDelay) do
+    while task.wait(0.5) do
         if Config.AutoPlaceEgg then
             local char = lp.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then
-                -- Menghitung posisi di permukaan (bawah rootpart)
-                local placePos = root.Position - Vector3.new(0, 3, 0)
+                -- Menaruh telur tepat di bawah posisi player
+                local pos = root.Position - Vector3.new(0, 3, 0)
                 
                 for i = 1, Config.PlaceAmount do
                     if not Config.AutoPlaceEgg then break end
-                    RS.GameEvents.PetEggService:FireServer("CreateEgg", placePos)
-                    task.wait(0.12) -- Safety delay to prevent kick
+                    RS.GameEvents.PetEggService:FireServer("CreateEgg", pos)
+                    task.wait(0.12) -- Safety delay
                 end
                 
-                -- Auto Turn-off setelah selesai loop
+                -- Mematikan toggle otomatis setelah selesai menaruh jumlah yang diminta
                 Config.AutoPlaceEgg = false
                 Fluent:Notify({
                     Title = "Nebula Hub",
-                    Content = "Finished placing " .. Config.PlaceAmount .. " eggs.",
+                    Content = "Done placing " .. tostring(Config.PlaceAmount) .. " eggs!",
                     Duration = 3
                 })
             end
@@ -291,3 +298,10 @@ Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 ToggleButton.MouseButton1Click:Connect(function() Window:Minimize() end)
 
 Window:SelectTab(1)
+
+-- Final notification to confirm script loaded
+Fluent:Notify({
+    Title = "Nebula Hub",
+    Content = "Script Loaded Successfully!",
+    Duration = 3
+})
