@@ -1,9 +1,8 @@
 --[[
-    NEBULA HUB | Simplified Edition (ESP + Trade Only)
+    NEBULA HUB | Simplified Edition (ESP + Trade + Auto Hatch)
     - Retained: ESP Visual Tab (Egg ESP with weight & size info)
     - Retained: Trade Tab (Auto Accept Request, Auto Add Pet, Auto Accept/Confirm)
-    - Removed: All other tabs and features (Dashboard, Scanner, Shop, Automatic, Misc, Global Setting, etc.)
-    - Kept only necessary core utilities for ESP and Trade functionality
+    - Added: Auto Hatch Tab with "Place Egg" feature (auto place eggs on farm)
 ]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -15,6 +14,9 @@ local CS = game:GetService("CollectionService")
 
 -- Replicated Modules
 local DataService = require(RS.Modules.DataService)
+
+-- PetEggService Remote
+local PetEggService = RS.GameEvents:FindFirstChild("PetEggService")
 
 -- ================= PET NAME (UPVALUE) FIX =================
 local eggPets = {}
@@ -34,16 +36,16 @@ task.spawn(updateEggPets)
 
 local Window = Fluent:CreateWindow({
     Title = "NEBULA HUB | Grow A Garden",
-    SubTitle = "ESP + Trade Only",
+    SubTitle = "ESP + Trade + Auto Hatch",
     Icon = "moon",
     TabWidth = 160,
-    Size = UDim2.fromOffset(510, 360),
+    Size = UDim2.fromOffset(510, 400),
     Acrylic = true,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl 
 })
 
--- Config only for retained features
+-- Config
 local Config = {
     TradeTargetPetName = "", 
     TradeMaxPetWeight = 2.0,
@@ -51,13 +53,16 @@ local Config = {
     AutoAddPetLoop = false,
     AutoAcceptTrade = false,
     IsTradeProcessing = false,
-    EspEgg = false
+    EspEgg = false,
+    AutoPlaceEgg = false,
+    PlaceEggDelay = 0.5  -- Delay between placing eggs
 }
 
--- Tabs (only ESP and Trade)
+-- Tabs (ESP, Trade, Auto Hatch)
 local Tabs = {
     EspVisual = Window:AddTab({ Title = "Esp Visual", Icon = "eye" }),
-    Trade = Window:AddTab({ Title = "Trade", Icon = "shopping-bag" })
+    Trade = Window:AddTab({ Title = "Trade", Icon = "shopping-bag" }),
+    AutoHatch = Window:AddTab({ Title = "Auto Hatch", Icon = "egg" })
 }
 
 -- ================= BASE WEIGHT LOGIC (FOR ESP) =================
@@ -229,6 +234,61 @@ task.spawn(function()
                     elseif data.states[myIdx] == "Accepted" then TradingController:Confirm() end
                 end
             end)
+        end
+    end
+end)
+
+--------------------------------------------------------------------------------
+-- AUTO HATCH TAB - PLACE EGG FEATURE
+--------------------------------------------------------------------------------
+local AutoHatchSec = Tabs.AutoHatch:AddSection("Auto Place Egg")
+
+AutoHatchSec:AddParagraph({
+    Title = "Info",
+    Content = "Automatically places all eggs from your backpack onto your farm.\nPosition: Fixed safe spot on farm (-33.97, 0.14, -99.29)"
+})
+
+AutoHatchSec:AddSlider("PlaceDelay", {
+    Title = "Place Delay (Seconds)",
+    Min = 0.1,
+    Max = 2,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(v) Config.PlaceEggDelay = v end
+})
+
+local AutoPlaceToggle = AutoHatchSec:AddToggle("AutoPlaceEgg", {
+    Title = "Auto Place Egg",
+    Default = false
+})
+
+AutoPlaceToggle:OnChanged(function()
+    Config.AutoPlaceEgg = AutoPlaceToggle.Value
+end)
+
+-- Fixed safe position on farm (from Cobalt dump)
+local PlacePosition = Vector3.new(-33.967506408691, 0.13552665710449, -99.29451751709)
+
+task.spawn(function()
+    while task.wait(Config.PlaceEggDelay) do
+        if Config.AutoPlaceEgg and PetEggService then
+            local backpack = lp:FindFirstChild("Backpack")
+            if backpack then
+                local hasEgg = false
+                for _, tool in pairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") and tool.Name:find("Egg") and tool:FindFirstChild("PetEggToolLocal") then
+                        hasEgg = true
+                        pcall(function()
+                            PetEggService:FireServer("CreateEgg", PlacePosition)
+                        end)
+                        break  -- One egg per delay to avoid spam/flags
+                    end
+                end
+                if not hasEgg then
+                    -- No more eggs, optionally auto-disable
+                    -- Config.AutoPlaceEgg = false
+                end
+            end
         end
     end
 end)
