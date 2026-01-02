@@ -1,12 +1,13 @@
 --[[
-    NEBULA HUB | TRADE & ESP EDITION
-    - Fitur Tersisa: Trade & Esp Visual
-    - Ukuran: Ringan & Teroptimasi
+    NEBULA HUB | Simplified Edition (ESP + Trade Only)
+    - Retained: ESP Visual Tab (Egg ESP with weight & size info)
+    - Retained: Trade Tab (Auto Accept Request, Auto Add Pet, Auto Accept/Confirm)
+    - Removed: All other tabs and features (Dashboard, Scanner, Shop, Automatic, Misc, Global Setting, etc.)
+    - Kept only necessary core utilities for ESP and Trade functionality
 ]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
-local http = game:GetService("HttpService")
 local RS = game:GetService("ReplicatedStorage")
 local Players = game.Players
 local lp = Players.LocalPlayer
@@ -14,10 +15,8 @@ local CS = game:GetService("CollectionService")
 
 -- Replicated Modules
 local DataService = require(RS.Modules.DataService)
-local ItemRarityFinder = require(RS.Modules.ItemRarityFinder)
-local GGStaticData = require(RS.Modules.GardenGuideModules.DataModules.GGStaticData)
 
--- ================= PET NAME FIX =================
+-- ================= PET NAME (UPVALUE) FIX =================
 local eggPets = {}
 local function updateEggPets()
     pcall(function()
@@ -34,9 +33,9 @@ end
 task.spawn(updateEggPets)
 
 local Window = Fluent:CreateWindow({
-    Title = "NEBULA HUB | Trade & ESP",
-    SubTitle = "Minimalist Version",
-    Icon = "eye",
+    Title = "NEBULA HUB | Grow A Garden",
+    SubTitle = "ESP + Trade Only",
+    Icon = "moon",
     TabWidth = 160,
     Size = UDim2.fromOffset(510, 360),
     Acrylic = true,
@@ -44,21 +43,24 @@ local Window = Fluent:CreateWindow({
     MinimizeKey = Enum.KeyCode.RightControl 
 })
 
--- Config
+-- Config only for retained features
 local Config = {
-    TradeTargetPetName = "", TradeMaxPetWeight = 2.0, TradePetAmount = 12,
-    TradeSubmitDelay = 0.15, AutoAcceptTrade = false, AutoAcceptRequest = false,
-    AutoAddPetLoop = false, IsTradeProcessing = false,
+    TradeTargetPetName = "", 
+    TradeMaxPetWeight = 2.0,
+    AutoAcceptRequest = false,
+    AutoAddPetLoop = false,
+    AutoAcceptTrade = false,
+    IsTradeProcessing = false,
     EspEgg = false
 }
 
--- Tabs
+-- Tabs (only ESP and Trade)
 local Tabs = {
     EspVisual = Window:AddTab({ Title = "Esp Visual", Icon = "eye" }),
     Trade = Window:AddTab({ Title = "Trade", Icon = "shopping-bag" })
 }
 
--- ================= BASE WEIGHT LOGIC =================
+-- ================= BASE WEIGHT LOGIC (FOR ESP) =================
 local EggBW = {_cache = {}, _isUpdating = false}
 local function buildBW()
     if EggBW._isUpdating then return end
@@ -192,16 +194,21 @@ TrdSec:AddToggle("AutoAccTrd", { Title = "Auto Accept & Confirm", Default = fals
 task.spawn(function()
     local TradeEvents = RS.GameEvents.TradeEvents
     local TradingController = require(RS.Modules.TradeControllers.TradingController)
+    
     TradeEvents.SendRequest.OnClientEvent:Connect(function(id)
-        if Config.AutoAcceptRequest then task.wait(0.3) TradeEvents.RespondRequest:FireServer(id, true) end
+        if Config.AutoAcceptRequest then 
+            task.wait(0.3) 
+            TradeEvents.RespondRequest:FireServer(id, true) 
+        end
     end)
+    
     while task.wait(0.1) do
         if Config.AutoAddPetLoop and TradingController.CurrentTradeReplicator and not Config.IsTradeProcessing then
             Config.IsTradeProcessing = true
             local added = 0
             for _, item in pairs(lp.Backpack:GetChildren()) do
                 if added >= 12 or not Config.AutoAddPetLoop then break end
-                if item.Name:lower():find(Config.TradeTargetPetName:lower()) then
+                if Config.TradeTargetPetName == "" or item.Name:lower():find(Config.TradeTargetPetName:lower()) then
                     local weight = tonumber(string.match(item.Name, "%d+%.?%d*")) or 0
                     if weight <= Config.TradeMaxPetWeight then
                         TradeEvents.AddItem:FireServer("Pet", tostring(item:GetAttribute("PET_UUID")))
@@ -212,6 +219,7 @@ task.spawn(function()
             end
             Config.IsTradeProcessing = false
         end
+        
         if Config.AutoAcceptTrade and TradingController.CurrentTradeReplicator then
             pcall(function()
                 local data = TradingController.CurrentTradeReplicator:GetData()
@@ -226,7 +234,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------------------------------------
--- UI TOGGLE
+-- MINIMIZE TOGGLE BUTTON
 --------------------------------------------------------------------------------
 if game.CoreGui:FindFirstChild("NebulaToggle") then game.CoreGui.NebulaToggle:Destroy() end
 local ToggleGui = Instance.new("ScreenGui", game.CoreGui)
@@ -235,7 +243,8 @@ ToggleGui.Name = "NebulaToggle"
 ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 ToggleButton.Position = UDim2.new(0, 15, 0.5, 0)
 ToggleButton.Size = UDim2.new(0, 45, 0, 45)
-ToggleButton.Text = "N"; ToggleButton.TextColor3 = Color3.fromRGB(120, 117, 242)
+ToggleButton.Text = "N"
+ToggleButton.TextColor3 = Color3.fromRGB(120, 117, 242)
 ToggleButton.Draggable = true
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
 ToggleButton.MouseButton1Click:Connect(function() Window:Minimize() end)
